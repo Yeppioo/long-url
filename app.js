@@ -302,49 +302,80 @@ function generateHTML(isErrorPage = false) {
     </div>
 
     <script>
-        document.getElementById('urlForm').addEventListener('submit', async function(e) {
+        // URL编码函数：将URL转换为自定义base2编码
+        function encodeUrlToCustomBase2(url) {
+            try {
+                // 将URL转换为UTF-8字节，然后转换为二进制字符串
+                const utf8Bytes = new TextEncoder().encode(url);
+                let binaryString = '';
+
+                for (let byte of utf8Bytes) {
+                    // 将每个字节转换为8位二进制字符串
+                    binaryString += byte.toString(2).padStart(8, '0');
+                }
+
+                // 将二进制字符串转换为自定义编码：0->i, 1->I
+                return binaryString.replace(/0/g, 'i').replace(/1/g, 'I');
+            } catch (error) {
+                return null;
+            }
+        }
+
+        // 验证URL格式
+        function isValidUrl(string) {
+            try {
+                const url = new URL(string);
+                return url.protocol === 'http:' || url.protocol === 'https:';
+            } catch (_) {
+                return false;
+            }
+        }
+
+        document.getElementById('urlForm').addEventListener('submit', function(e) {
             e.preventDefault();
 
             const originalUrl = document.getElementById('originalUrl').value;
             const resultDiv = document.getElementById('result');
             const shortUrlDiv = document.getElementById('shortUrl');
 
-            try {
-                const response = await fetch('/api/shorten', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ url: originalUrl })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    shortUrlDiv.textContent = data.shortUrl;
-                    resultDiv.classList.add('show');
-                } else {
-                    alert('生成失败：' + data.error);
-                }
-            } catch (error) {
-                alert('网络错误，请稍后重试');
+            if (!originalUrl) {
+                alert('请提供有效的URL');
+                return;
             }
-        });
 
-        function copyToClipboard() {
-            const shortUrl = document.getElementById('shortUrl').textContent;
-            navigator.clipboard.writeText(shortUrl).then(function() {
-                const btn = document.querySelector('.copy-btn');
-                const originalText = btn.textContent;
-                btn.textContent = '已复制！';
-                setTimeout(() => {
-                    btn.textContent = originalText;
-                }, 2000);
-            });
-        }
-    </script>
-</body>
-</html>
+            if (!isValidUrl(originalUrl)) {
+                alert('请提供有效的HTTP/HTTPS链接');
+                return;
+            }
+
+            // 直接调用编码函数
+            const encoded = encodeUrlToCustomBase2(originalUrl);
+
+            if (!encoded) {
+                alert('编码失败，请稍后重试');
+                return;
+            }
+
+            const shortUrl = 'https://i.iiiii.im/' + encoded;
+
+  shortUrlDiv.textContent = shortUrl;
+  resultDiv.classList.add('show');
+});
+
+function copyToClipboard() {
+  const shortUrl = document.getElementById('shortUrl').textContent;
+  navigator.clipboard.writeText(shortUrl).then(function () {
+    const btn = document.querySelector('.copy-btn');
+    const originalText = btn.textContent;
+    btn.textContent = '已复制！';
+    setTimeout(() => {
+      btn.textContent = originalText;
+    }, 2000);
+  });
+}
+    </script >
+</body >
+</html >
   `;
 }
 
@@ -354,34 +385,7 @@ app.get('/', (_, res) => {
   res.send(generateHTML(false));
 });
 
-// API路由 - 生成短链接
-app.post('/api/shorten', (req, res) => {
-  const { url } = req.body;
 
-  if (!url) {
-    return res.json({ success: false, error: '请提供有效的URL' });
-  }
-
-  if (!isValidUrl(url)) {
-    return res.json({ success: false, error: '请提供有效的HTTP/HTTPS链接' });
-  }
-
-  // 直接对URL进行编码
-  const encoded = encodeUrlToCustomBase2(url);
-
-  if (!encoded) {
-    return res.json({ success: false, error: '编码失败，请稍后重试' });
-  }
-
-  const shortUrl = `https://i.iiiii.im/${encoded}`;
-
-  res.json({
-    success: true,
-    shortUrl: shortUrl,
-    originalUrl: url,
-    code: encoded
-  });
-});
 
 // 短链接重定向路由
 app.get('/:code', (req, res) => {
